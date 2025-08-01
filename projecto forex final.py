@@ -20,6 +20,7 @@ class ForexTradingBot:
     def open_trade(self, trade_type, price):
         # Open a trade of the specified type (buy/sell)
         print(f"Opening {trade_type} trade for {self.symbol} at price {price}")
+        
 
     def close_trade(self, trade_id):
         # Close a trade by its ID
