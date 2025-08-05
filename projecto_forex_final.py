@@ -4,11 +4,13 @@ import logging
 import pandas as pd
 import argparse
 import threading
+import matplotlib
 
+mt5.initialize()
 
-ACCOUNT = 1009160           # your trading account number
-PASSWORD = "I9tqhwal_"   # your account password
-SERVER = "JFD-DEMO"     # your broker's server name
+ACCOUNT = 515997           # Número conta de negociação
+PASSWORD = "I9tqhwal_"   # Password da conta
+SERVER = "SquaredFinancialSC-MT5 Demo"     # Nome do servidor da corretora 
 
 if not mt5.initialize(login=ACCOUNT, password=PASSWORD, server=SERVER):
     logging.error("MetaTrader5 initialization failed. Error: %s", mt5.last_error())
@@ -33,7 +35,7 @@ class ForexTradingBot:
         df['signal'] = df['macd'].ewm(span=9, adjust=False).mean()
         return df[['macd', 'signal']].iloc[-1]
 
-    def place_order(self, action):
+    def order_send(self, action):
         symbol_info = mt5.symbol_info(self.symbol)
         if symbol_info is None:
             logging.error(f"Symbol {self.symbol} not found.")
@@ -44,40 +46,45 @@ class ForexTradingBot:
         sl = price - 100 * point if action == 'buy' else price + 100 * point
         tp = price + 100 * point if action == 'buy' else price - 100 * point
 
-        order_type = 0 if action == 'buy' else 1 # 0 for buy, 1 for sell
+        order_send = 0 if action == 'buy' else 1 # 0 para comprar, 1 para vender
+        if action == 'buy':
+            logging.info(f"Placing BUY order for {self.symbol} at price {price}")
+        else:
+            logging.info(f"Placing SELL order for {self.symbol} at price {price}")
+            
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
             "symbol": self.symbol,
             "volume": self.lot_size,
-            "type": order_type,
+            "type": mt5.ORDER_TYPE_BUY if action == 'buy' else mt5.ORDER_TYPE_SELL,
+            "type_filling": mt5.ORDER_FILLING_IOC,
             "price": price,
             "sl": sl,
             "tp": tp,
             "deviation": 10,
             "magic": 234000,
             "comment": f"{action} order",
-            "type_time": mt5.ORDER_TIME_GTC,
         }
     
     def run(self):
         logging.info(f"Starting trading bot for {self.symbol} with lot size {self.lot_size}")
         last_macd = None
         last_signal = None
-        cooldown = 60 # seconds cooldown to avoid rapid trading
+        cooldown = 60 # segundos de cooldown entre ordens
         while True:
             macd_data = self.get_macd()
             if macd_data is not None:
                 logging.info(f"MACD: {macd_data['macd']}, Signal: {macd_data['signal']}")
                 if last_macd is not None and last_signal is not None:
-                    # MACD crosses below Signal -> SELL
+                    # MACD cruza abaixo da linha se sinal -> VENDER
                     if last_macd > last_signal and macd_data['macd'] < macd_data['signal']:
                         logging.info("MACD crossed below Signal. Placing SELL order.")
-                        self.place_order("sell")
+                        self.order_send("sell")
                         time.sleep(cooldown)
-                    # MACD crosses above Signal -> BUY
+                    # MACD cruza acima da linha de sinal -> COMPRAR
                     elif last_macd < last_signal and macd_data['macd'] > macd_data['signal']:
                         logging.info("MACD crossed above Signal. Placing BUY order.")
-                        self.place_order("buy")
+                        self.order_send("buy")
                         time.sleep(cooldown)
                 last_macd = macd_data['macd']
                 last_signal = macd_data['signal']
@@ -85,12 +92,12 @@ class ForexTradingBot:
 
 def main():
     parser = argparse.ArgumentParser(description='Forex Trading Bot')
-    parser.add_argument('--lot_size', type=float, default=0.1, help='Lot size for trades')
+    parser.add_argument('--lot_size', type=float, default=0.2, help='Lot size for trades')
     args = parser.parse_args()
 
     symbols = ["EURUSD", "USDJPY"]
 
-    bots = [ForexTradingBot(symbol=s, lot_size=args.lot_size) for s in symbols]
+    bots = [ForexTradingBot(symbol=s, lot_size = args.lot_size) for s in symbols]
     threads = []
     for bot in bots:
         t = threading.Thread(target=bot.run)
