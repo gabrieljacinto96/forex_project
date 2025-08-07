@@ -4,17 +4,21 @@ import logging
 import pandas as pd
 import argparse
 import threading
-import matplotlib
 
-mt5.initialize()
+mt5.initialize(path="C:\\Program Files\\MetaTrader 5\\terminal64.exe")
 
-ACCOUNT = 515997           # Número conta de negociação
-PASSWORD = "I9tqhwal_"   # Password da conta
-SERVER = "SquaredFinancialSC-MT5 Demo"     # Nome do servidor da corretora 
-
-if not mt5.initialize(login=ACCOUNT, password=PASSWORD, server=SERVER):
-    logging.error("MetaTrader5 initialization failed. Error: %s", mt5.last_error())
-    exit(1)
+account=1009160
+authorized=mt5.login(account, password="I9tqhwal_", server="JFD-DEMO")
+if authorized:
+    
+    print(mt5.account_info())
+    
+    print("Show account_info()._asdict():")
+    account_info_dict = mt5.account_info()._asdict()
+    for prop in account_info_dict:
+        print("  {}={}".format(prop, account_info_dict[prop]))
+else:
+    print("failed to connect at account #{}, error code: {}".format(account, mt5.last_error()))
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -66,6 +70,12 @@ class ForexTradingBot:
             "comment": f"{action} order",
         }
     
+        result = mt5.order_send(request)
+        if result.retcode != mt5.TRADE_RETCODE_DONE:
+            logging.error(f"Order failed: {result.retcode}, {result}")
+        else:
+            logging.info(f"Order placed successfully: {result}")
+            
     def run(self):
         logging.info(f"Starting trading bot for {self.symbol} with lot size {self.lot_size}")
         last_macd = None
@@ -109,4 +119,5 @@ def main():
 
 if __name__ == "__main__":
     main()
-    mt5.shutdown()
+
+mt5.shutdown()
